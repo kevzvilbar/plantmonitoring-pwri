@@ -87,11 +87,14 @@ else:
         "Install mongomock_motor or configure MONGO_URL."
     )
 
-# Lifespan replaces the deprecated @app.on_event("startup"/"shutdown")
+# Lifespan: open asyncpg pool on startup, close both pools on shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import db as pg_db
+    await pg_db.get_pool()          # warm up the Render PG connection pool
     yield
-    client.close()
+    client.close()                  # MongoDB
+    await pg_db.close_pool()        # Render PostgreSQL
 
 # Create the main app without a prefix
 app = FastAPI(lifespan=lifespan)
@@ -1032,6 +1035,13 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+# Render PostgreSQL — auth, RPC, and generic CRUD routers
+from auth_router import router as auth_router_pg, rpc_router
+from crud_router import router as crud_router
+app.include_router(auth_router_pg)
+app.include_router(rpc_router)
+app.include_router(crud_router)
 
 # Configure logging
 logging.basicConfig(
