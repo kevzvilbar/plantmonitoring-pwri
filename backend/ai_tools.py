@@ -174,7 +174,7 @@ async def chat_with_tools(
             table = plan.get("table")
             if not table or table not in READ_WHITELIST:
                 raise ValueError(f"Table '{table}' not allowed")
-            fetched = safe_select(
+            fetched = await safe_select(
                 table=table,
                 select=plan.get("select"),
                 filters=plan.get("filters"),

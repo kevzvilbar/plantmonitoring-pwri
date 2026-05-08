@@ -97,3 +97,55 @@ class _Result:
 def _client() -> _PgClient:
     """Return the asyncpg-backed pseudo-client. Always returns a valid client."""
     return _PgClient()
+
+
+# ── AI tools compatibility ─────────────────────────────────────────────────────
+
+READ_WHITELIST: dict[str, list[str]] = {
+    "plants":               ["id", "name", "status", "design_capacity_m3", "address"],
+    "wells":                ["id", "plant_id", "name", "status"],
+    "well_readings":        ["id", "well_id", "plant_id", "reading_datetime", "current_reading", "daily_volume"],
+    "locators":             ["id", "plant_id", "name", "status"],
+    "locator_readings":     ["id", "locator_id", "plant_id", "reading_datetime", "current_reading", "daily_volume"],
+    "ro_trains":            ["id", "plant_id", "name", "status"],
+    "ro_train_readings":    ["id", "ro_train_id", "plant_id", "reading_datetime", "permeate_tds", "permeate_ph", "recovery_pct"],
+    "incidents":            ["id", "plant_id", "occurred_at", "severity", "category", "description", "status"],
+    "chemical_dosing_logs": ["id", "plant_id", "dosing_date", "chemical_name", "amount_used"],
+    "power_readings":       ["id", "plant_id", "reading_datetime", "kwh_consumed"],
+    "daily_plant_summary":  ["id", "plant_id", "summary_date", "nrw_pct", "downtime_hrs", "permeate_tds", "recovery_pct"],
+    "checklist_executions": ["id", "template_id", "plant_id", "execution_date", "completed"],
+}
+
+
+async def safe_select(
+    table: str,
+    select: str | None = None,
+    filters: dict | None = None,
+    order_by: str | None = None,
+    desc: bool = False,
+    limit: int = 100,
+) -> list[dict]:
+    """Async safe SELECT for AI tools — restricted to READ_WHITELIST tables."""
+    if table not in READ_WHITELIST:
+        raise ValueError(f"Table '{table}' not in read whitelist")
+
+    allowed_cols = READ_WHITELIST[table]
+    cols = select if select and select != "*" else ", ".join(allowed_cols)
+    # Validate requested cols are in whitelist
+    requested = [c.strip() for c in cols.split(",")]
+    safe_cols  = [c for c in requested if c in allowed_cols]
+    col_str    = ", ".join(f'"{c}"' for c in safe_cols) if safe_cols else "*"
+
+    where_parts: list[str] = []
+    values: list = []
+    idx = 1
+    for col, val in (filters or {}).items():
+        if col in allowed_cols:
+            where_parts.append(f'"{col}" = ${idx}')
+            values.append(val)
+            idx += 1
+
+    where  = "WHERE " + " AND ".join(where_parts) if where_parts else ""
+    order  = f'ORDER BY "{order_by}" {"DESC" if desc else "ASC"}' if order_by and order_by in allowed_cols else ""
+    query  = f'SELECT {col_str} FROM "{table}" {where} {order} LIMIT {int(limit)}'
+    return await db.fetch(query, *values)
