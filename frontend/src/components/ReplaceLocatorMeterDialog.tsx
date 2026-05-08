@@ -1,0 +1,1 @@
+// This file contains the logic for the locator-specific meter replacement.\n\nimport React from 'react';\n\nconst ReplaceLocatorMeterDialog = () => {\n    return (\n        <div>\n            <h2>Replace Locator Meter</h2>\n            {/* Replacement logic and UI goes here */}\n        </div>\n    );\n};\n\nexport default ReplaceLocatorMeterDialog;
