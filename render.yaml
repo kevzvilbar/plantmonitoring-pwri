@@ -2,29 +2,25 @@ services:
   # ─── Backend: FastAPI web service ─────────────────────────────────────────
   - type: web
     name: pwri-backend
-    runtime: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    runtime: docker
+    rootDir: .
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.0
       - key: MONGO_URL
-        sync: false          # set manually in Render dashboard
+        sync: false
       - key: DB_NAME
         value: pwri
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pwri-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
       - key: OPENAI_API_KEY
         sync: false
       - key: CRON_SECRET
         sync: false
-      # Set this to your Render static site URL once it is deployed,
-      # e.g. https://pwri-frontend.onrender.com
       - key: CORS_ORIGINS
-        sync: false
+        sync: false   # set to your frontend Render URL once deployed
 
   # ─── Frontend: Vite/React static site ─────────────────────────────────────
   - type: web
@@ -38,10 +34,11 @@ services:
         source: /*
         destination: /index.html
     envVars:
-      - key: VITE_SUPABASE_URL
-        sync: false
-      - key: VITE_SUPABASE_PUBLISHABLE_KEY
-        sync: false
-      # Point to your Render backend URL, e.g. https://pwri-backend.onrender.com
+      # Point to your backend Render URL, e.g. https://pwri-backend.onrender.com
       - key: VITE_BACKEND_URL
         sync: false
+
+databases:
+  - name: pwri-db
+    databaseName: pwri
+    plan: free
